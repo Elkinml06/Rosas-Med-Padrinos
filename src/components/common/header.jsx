@@ -1,66 +1,47 @@
-import { NavLink } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 const Header = () => {
+  const location = useLocation();
+
+  const pasoActivo = (ruta) => {
+    if (ruta === "/") return location.pathname === "/";
+    return location.pathname.startsWith(ruta);
+  };
+
+  const itemClass = (activo) =>
+    `font-medium transition ${
+      activo
+        ? "text-pink-600"
+        : "text-gray-400"
+    }`;
+
   return (
     <header className="w-full bg-white shadow-md sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
 
-        {/* Logo */}
-        <NavLink
-          to="/"
-          className="text-xl font-bold text-pink-600"
-        >
+        {/* Logo (este sí puede navegar si quieres) */}
+        <div className="text-xl font-bold text-pink-600">
           Flores UNAB 🌹
-        </NavLink>
+        </div>
 
-        {/* Flujo de pasos */}
-        <nav className="hidden md:flex items-center gap-4">
+        {/* Flujo visual */}
+        <nav className="hidden md:flex items-center gap-4 select-none">
 
-          {/* Productos */}
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              `transition font-medium ${
-                isActive
-                  ? "text-pink-600"
-                  : "text-gray-400 hover:text-gray-600"
-              }`
-            }
-          >
+          <span className={itemClass(pasoActivo("/"))}>
             Productos
-          </NavLink>
+          </span>
 
           <span className="text-gray-400">→</span>
 
-          {/* Datos */}
-          <NavLink
-            to="/datos"
-            className={({ isActive }) =>
-              `transition font-medium ${
-                isActive
-                  ? "text-pink-600"
-                  : "text-gray-400 hover:text-gray-600"
-              }`
-            }
-          >
+          <span className={itemClass(pasoActivo("/datos"))}>
             Datos
-          </NavLink>
+          </span>
 
           <span className="text-gray-400">→</span>
 
-          {/* Pago */}
-          <NavLink
-            to="/pago"
-            className={({ isActive }) =>
-              `transition font-medium ${
-                isActive
-                  ? "text-pink-600"
-                  : "text-gray-400 hover:text-gray-600"
-              }`
-            }
-          >
+          <span className={itemClass(pasoActivo("/pago"))}>
             Pago
-          </NavLink>
+          </span>
 
         </nav>
       </div>
