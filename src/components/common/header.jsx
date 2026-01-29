@@ -1,35 +1,59 @@
+import { NavLink } from "react-router-dom";
+
 const Header = () => {
   return (
     <header className="w-full bg-white shadow-md">
       <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
 
         {/* Logo */}
-        <h1 className="text-xl font-bold text-pink-600">
+        <NavLink
+          to="/"
+          className="text-xl font-bold text-pink-600"
+        >
           Flores UNAB 🌹
-        </h1>
+        </NavLink>
 
         {/* Navegación */}
         <nav className="space-x-6 hidden md:block">
-          <a
-            href="#"
-            className="text-gray-600 hover:text-pink-600 transition"
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `transition ${
+                isActive
+                  ? "text-pink-600 font-semibold"
+                  : "text-gray-600 hover:text-pink-600"
+              }`
+            }
           >
-            Inicio
-          </a>
-          <a
-            href="#"
-            className="text-gray-600 hover:text-pink-600 transition"
-          >
-            Comprar
-          </a>
-          <a
-            href="#"
-            className="text-gray-600 hover:text-pink-600 transition"
-          >
-            Contacto
-          </a>
-        </nav>
+            Productos
+          </NavLink>
 
+          <NavLink
+            to="/datos"
+            className={({ isActive }) =>
+              `transition ${
+                isActive
+                  ? "text-pink-600 font-semibold"
+                  : "text-gray-600 hover:text-pink-600"
+              }`
+            }
+          >
+            Datos
+          </NavLink>
+
+          <NavLink
+            to="/pago"
+            className={({ isActive }) =>
+              `transition ${
+                isActive
+                  ? "text-pink-600 font-semibold"
+                  : "text-gray-600 hover:text-pink-600"
+              }`
+            }
+          >
+            Pago
+          </NavLink>
+        </nav>
       </div>
     </header>
   );
