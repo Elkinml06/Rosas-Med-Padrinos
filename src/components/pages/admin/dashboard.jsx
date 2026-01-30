@@ -4,6 +4,7 @@ const Dashboard = () => {
   const [pedidos, setPedidos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
 
   // Cargar pedidos
   useEffect(() => {
@@ -340,13 +341,52 @@ const Dashboard = () => {
                       ${pedido.total?.toLocaleString()}
                     </div>
                     {pedido.pago?.comprobante && (
-                      <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                        </svg>
-                        Comprobante: {pedido.pago.comprobante.nombre}
-                      </p>
-                    )}
+  <div className="mt-3 space-y-2">
+    <p className="text-sm text-gray-500 flex items-center gap-1">
+      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+      </svg>
+      Comprobante: {pedido.pago.comprobante.nombre}
+    </p>
+
+    {/* 👇 IMAGEN DEL COMPROBANTE (Miniatura) */}
+{pedido.pago.comprobante.base64 && (
+  <>
+    <img
+      src={pedido.pago.comprobante.base64}
+      alt="Comprobante de pago"
+      onClick={() => setIsOpen(true)} // Abrir modal
+      className="w-40 rounded-lg border border-gray-300 shadow-sm hover:scale-105 transition-transform cursor-pointer"
+    />
+
+    {/* 👇 MODAL (Se muestra solo si isOpen es true) */}
+    {isOpen && (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 animate-in fade-in duration-300"
+        onClick={() => setIsOpen(false)} // Cerrar al hacer clic fuera
+      >
+        <div className="relative max-w-3xl w-full flex flex-col items-center">
+          {/* Botón de cerrar */}
+          <button 
+            className="absolute -top-10 right-0 text-white text-xl font-bold hover:text-gray-300"
+            onClick={() => setIsOpen(false)}
+          >
+            Cerrar ✕
+          </button>
+          
+          <img
+            src={pedido.pago.comprobante.base64}
+            alt="Comprobante ampliado"
+            className="max-h-[90vh] max-w-full rounded-md shadow-2xl object-contain"
+          />
+        </div>
+      </div>
+    )}
+  </>
+)}
+  </div>
+)}
+
                   </div>
 
                   <div className="flex gap-3">

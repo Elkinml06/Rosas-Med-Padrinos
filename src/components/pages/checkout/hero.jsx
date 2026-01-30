@@ -34,13 +34,26 @@ export default function PagoNequi() {
     setDragActive(false);
     handleFile(e.dataTransfer.files[0]);
   };
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject("Error al convertir archivo");
+  });
+};
 
-  const enviarPedido = () => {
+const enviarPedido = async () => {
+  try {
     if (!file) return;
+
     const productos =
       JSON.parse(localStorage.getItem("productosSeleccionados")) || [];
     const datosCliente = JSON.parse(localStorage.getItem("datosPedido"));
+
     if (!datosCliente) return alert("Faltan los datos del cliente");
+
+    const base64 = await fileToBase64(file);
 
     const pedidoFinal = {
       id: `PED-${Date.now()}`,
@@ -55,6 +68,7 @@ export default function PagoNequi() {
           nombre: file.name,
           tipo: file.type,
           tamaño: file.size,
+          base64,
         },
       },
     };
@@ -62,8 +76,15 @@ export default function PagoNequi() {
     const pedidosPrevios = JSON.parse(localStorage.getItem("pedidos")) || [];
     pedidosPrevios.push(pedidoFinal);
     localStorage.setItem("pedidos", JSON.stringify(pedidosPrevios));
+
     setPedidoEnviado(true);
-  };
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar el pedido. Intenta nuevamente.");
+  }
+};
+
+
 
   if (pedidoEnviado) {
     return (
