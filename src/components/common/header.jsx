@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import Logo from "../../assets/Logo UNAB Rojo.png";
 
 const Header = () => {
   const location = useLocation();
@@ -26,10 +27,16 @@ const Header = () => {
     <header className="w-full bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between">
         
-        {/* Logo U - Tamaños responsive */}
-        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mx-auto sm:mx-0 mb-2 sm:mb-0">
-          <span className="text-white font-bold text-base sm:text-lg">U</span>
-        </div>
+{/* Logo UNAB */}
+<div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto sm:mx-0 mb-2 sm:mb-0">
+  <img
+    src={Logo}
+    alt="Logo UNAB"
+    className="w-full h-full object-contain"
+  />
+</div>
+
+
           
 
         {/* Flujo visual mejorado - Responsive sin cambiar estructura */}
