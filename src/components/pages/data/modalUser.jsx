@@ -76,6 +76,7 @@ export default function DatosPedido() {
       "datosPedido",
       JSON.stringify({
         anonimo,
+        nombreRemitente,
         nombreReceptor,
         contacto,
         mensajes,
@@ -134,103 +135,103 @@ export default function DatosPedido() {
 
               <div className="space-y-6">
                 <div className="space-y-2">
-  {/* TITULO */}
-  <p className="text-sm font-semibold text-gray-700">
-    Tipo de envío
-  </p>
+                  {/* TITULO */}
+                  <p className="text-sm font-semibold text-gray-700">
+                    Tipo de envío
+                  </p>
 
-  {/* DESCRIPCIÓN */}
-  <p className="text-xs text-gray-500">
-    Elige si quieres que tu nombre aparezca o enviar el regalo en anonimato.
-  </p>
+                  {/* DESCRIPCIÓN */}
+                  <p className="text-xs text-gray-500">
+                    Elige si quieres que tu nombre aparezca o enviar el regalo en anonimato.
+                  </p>
 
-  {/* OPCIONES */}
-  <div className="flex flex-col sm:flex-row gap-4 mt-2">
-    {[
-      { label: "Sí, anónimo", value: true },
-      { label: "No, mostrar mi nombre", value: false },
-    ].map((op) => (
-      <label
-        key={op.label}
-        className="flex items-center gap-3 cursor-pointer"
-      >
-        <input
-          type="radio"
-          checked={anonimo === op.value}
-          onChange={() => setAnonimo(op.value)}
-        />
-        <span>{op.label}</span>
-      </label>
-    ))}
-  </div>
-</div>
+                  {/* OPCIONES */}
+                  <div className="flex flex-col sm:flex-row gap-4 mt-2">
+                    {[
+                      { label: "Sí, anónimo", value: true },
+                      { label: "No, mostrar mi nombre", value: false },
+                    ].map((op) => (
+                      <label
+                        key={op.label}
+                        className="flex items-center gap-3 cursor-pointer"
+                      >
+                        <input
+                          type="radio"
+                          checked={anonimo === op.value}
+                          onChange={() => setAnonimo(op.value)}
+                        />
+                        <span>{op.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
 
                 {/* Nombre remitente (solo si no es anónimo) */}
-{!anonimo && (
-  <div className="space-y-1">
-    <p className="text-sm font-semibold text-gray-700">
-      Tu nombre
-    </p>
-    <input
-      type="text"
-      placeholder="Ej: Juan Pérez"
-      className="w-full p-3 rounded-xl border"
-      value={nombreRemitente}
-      onChange={(e) => setNombreRemitente(e.target.value)}
-    />
-  </div>
-)}
+                {!anonimo && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-gray-700">
+                      Tu nombre
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Ej: Juan Pérez"
+                      className="w-full p-3 rounded-xl border"
+                      value={nombreRemitente}
+                      onChange={(e) => setNombreRemitente(e.target.value)}
+                    />
+                  </div>
+                )}
 
-{/* Nombre receptor */}
-<div className="space-y-1">
-  <p className="text-sm font-semibold text-gray-700">
-    Nombre del receptor
-  </p>
-  <input
-    type="text"
-    placeholder="Ej: María López"
-    className="w-full p-3 rounded-xl border"
-    value={nombreReceptor}
-    onChange={(e) => setNombreReceptor(e.target.value)}
-  />
-</div>
+                {/* Nombre receptor */}
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    Nombre del receptor
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Ej: María López"
+                    className="w-full p-3 rounded-xl border"
+                    value={nombreReceptor}
+                    onChange={(e) => setNombreReceptor(e.target.value)}
+                  />
+                </div>
 
-{/* Contacto */}
-<div className="space-y-1">
-  <p className="text-sm font-semibold text-gray-700">
-    Número de contacto
-  </p>
-  <input
-    type="text"
-    placeholder="Ej: 3001234567"
-    className="w-full p-3 rounded-xl border"
-    value={contacto}
-    onChange={(e) =>
-      setContacto(e.target.value.replace(/\D/g, ""))
-    }
-  />
-</div>
+                {/* Contacto */}
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    Número de contacto
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Ej: 3001234567"
+                    className="w-full p-3 rounded-xl border"
+                    value={contacto}
+                    onChange={(e) =>
+                      setContacto(e.target.value.replace(/\D/g, ""))
+                    }
+                  />
+                </div>
 
-{/* Mensajes de cartas */}
-{mensajes.map((mensaje, i) => (
-  <div key={i} className="space-y-1">
-    <p className="text-sm font-semibold text-gray-700">
-      Mensaje de la carta {i + 1}
-    </p>
-    <textarea
-      placeholder="Escribe aquí tu mensaje..."
-      className="w-full p-3 rounded-xl border h-36 resize-none"
-      maxLength={500}
-      value={mensaje}
-      onChange={(e) => {
-        const copy = [...mensajes];
-        copy[i] = e.target.value;
-        setMensajes(copy);
-      }}
-    />
-  </div>
-))}
+                {/* Mensajes de cartas */}
+                {mensajes.map((mensaje, i) => (
+                  <div key={i} className="space-y-1">
+                    <p className="text-sm font-semibold text-gray-700">
+                      Mensaje de la carta {i + 1}
+                    </p>
+                    <textarea
+                      placeholder="Escribe aquí tu mensaje..."
+                      className="w-full p-3 rounded-xl border h-36 resize-none"
+                      maxLength={500}
+                      value={mensaje}
+                      onChange={(e) => {
+                        const copy = [...mensajes];
+                        copy[i] = e.target.value;
+                        setMensajes(copy);
+                      }}
+                    />
+                  </div>
+                ))}
 
               </div>
             </div>

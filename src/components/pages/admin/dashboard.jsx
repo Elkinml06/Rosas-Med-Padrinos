@@ -8,6 +8,18 @@ const Dashboard = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Estados para UI
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  const [notification, setNotification] = useState({ show: false, type: "", message: "" });
+  const [loadingAction, setLoadingAction] = useState(false);
+
+  // Helper para notificaciones
+  const showNotification = (type, message) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => setNotification({ show: false, type: "", message: "" }), 4000);
+  };
+
   // Cargar pedidos desde Supabase
   const cargarPedidos = async () => {
     try {
@@ -29,20 +41,17 @@ const Dashboard = () => {
       }
 
       // Mapear los datos de Supabase al formato que espera el Dashboard
-      const pedidosFormateados = data.map(p => {
-        // Parsear JSONs si vienen como strings (aunque supabase returna objetos si es jsonb, a veces ayuda asegurar)
+      const pedidosFormateados = data.map((p, index) => {
         let productos = [];
         let datosEnvio = {};
-
         try {
           productos = typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos;
           datosEnvio = typeof p.datos_envio === 'string' ? JSON.parse(p.datos_envio) : p.datos_envio;
-        } catch (e) {
-          console.error("Error parseando JSON:", e);
-        }
+        } catch (e) { console.error("Error parseando JSON:", e); }
 
         return {
           id: p.id,
+          numero: data.length - index, // Número secuencial basado en el total
           fecha: p.created_at,
           estado: p.estado,
           total: p.total,
@@ -59,7 +68,7 @@ const Dashboard = () => {
             metodo: "Nequi",
             comprobante: {
               nombre: "Comprobante",
-              base64: p.archivo_url // Usamos la URL pública aquí
+              base64: p.archivo_url
             }
           }
         };
@@ -77,12 +86,12 @@ const Dashboard = () => {
     cargarPedidos();
   }, []);
 
-  // Cambiar estado en Supabase
+  // Cambiar estado
   const cambiarEstado = async (id) => {
     const pedidoActual = pedidos.find(p => p.id === id);
-    const nuevoEstado = pedidoActual.estado === "pendiente" ? "entregado" : "pendiente";
+    const nuevoEstado = pedidoActual.estado === "pendiente" ? "aprobado" : "pendiente";
 
-    // Optimistic UI update
+    // Optimistic
     setPedidos(pedidos.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
 
     const { error } = await supabase
@@ -92,92 +101,149 @@ const Dashboard = () => {
 
     if (error) {
       console.error("Error actualizando estado:", error);
-      alert("Error al actualizar el estado");
-      cargarPedidos(); // revertir
+      showNotification("error", "Error al actualizar el estado");
+      cargarPedidos();
+    } else {
+      showNotification("success", `Pedido marcado como ${nuevoEstado}`);
     }
   };
 
-  // Eliminar pedido en Supabase
-  // Eliminar pedido en Supabase (Cascading Delete)
-  const eliminarPedido = async (id) => {
-    if (!confirm("¿Estás seguro de eliminar este pedido permanentemente? Esto borrará también al cliente y la imagen.")) return;
+  // Abrir modal de confirmación
+  const solicitarEliminacion = (id) => {
+    setOrderToDelete(id);
+    setShowDeleteModal(true);
+  };
 
-    const pedidoAEliminar = pedidos.find(p => p.id === id);
-    if (!pedidoAEliminar) return;
+  // Ejecutar eliminación
+  const confirmarEliminacion = async () => {
+    if (!orderToDelete) return;
+    setLoadingAction(true);
 
-    // Optimistic UI update
+    const pedidoAEliminar = pedidos.find(p => p.id === orderToDelete);
     const pedidosPrevios = [...pedidos];
-    setPedidos(pedidos.filter(p => p.id !== id));
+
+    // Optimistic delete
+    setPedidos(pedidos.filter(p => p.id !== orderToDelete));
+    setShowDeleteModal(false); // cerrar modal rapido para UX
 
     try {
-      // 1. Eliminar Imagen del Storage
-      if (pedidoAEliminar.pago?.comprobante?.base64) {
+      // 1. Storage
+      if (pedidoAEliminar?.pago?.comprobante?.base64) {
         const url = pedidoAEliminar.pago.comprobante.base64;
-        // Extraer el path relativo. Ejemplo: .../vouchers/comprobantes/archivo.jpg -> comprobantes/archivo.jpg
         const path = url.split('/vouchers/')[1];
         if (path) {
-          const { error: errorStorage } = await supabase.storage
-            .from('vouchers')
-            .remove([path]);
-
-          if (errorStorage) console.error("Error borrando imagen:", errorStorage);
+          const { error: errorStorage } = await supabase.storage.from('vouchers').remove([path]);
+          if (errorStorage) console.error("Error Storage:", errorStorage);
         }
       }
 
-      // 2. Eliminar el Pedido (comprobantes_pago)
-      const { error: errorPedido } = await supabase
-        .from('comprobantes_pago')
-        .delete()
-        .eq('id', id);
-
+      // 2. Pedido
+      const { error: errorPedido } = await supabase.from('comprobantes_pago').delete().eq('id', orderToDelete);
       if (errorPedido) throw errorPedido;
 
-      // 3. Eliminar el Cliente (clientes)
-      // Solo si tenemos el ID (lo agregamos en el mapeo)
-      if (pedidoAEliminar.clienteId) {
-        const { error: errorCliente } = await supabase
-          .from('clientes')
-          .delete()
-          .eq('id', pedidoAEliminar.clienteId);
-
-        if (errorCliente) console.error("Error borrando cliente:", errorCliente);
+      // 3. Cliente
+      if (pedidoAEliminar?.clienteId) {
+        await supabase.from('clientes').delete().eq('id', pedidoAEliminar.clienteId);
       }
 
+      await cargarPedidos(); // Sincronizar
+      showNotification("success", "Pedido eliminado correctamente");
+
     } catch (error) {
-      console.error("Error eliminando pedido completo:", error);
-      alert("Error al eliminar el pedido. Revisa la consola.");
-      setPedidos(pedidosPrevios); // revertir si falla la eliminación crítica del pedido
+      console.error("Error eliminación:", error);
+      showNotification("error", "Error al eliminar el pedido");
+      setPedidos(pedidosPrevios); // Revertir
+    } finally {
+      setLoadingAction(false);
+      setOrderToDelete(null);
     }
   };
 
   // Filtros
   const pedidosFiltrados = pedidos.filter((pedido) => {
-    const coincideEstado =
-      filtroEstado === "todos" || pedido.estado === filtroEstado;
-
-    const nombre =
-      pedido.cliente?.nombreReceptor?.toLowerCase() || "";
-
-    const coincideNombre = nombre.includes(busqueda.toLowerCase());
-
-    return coincideEstado && coincideNombre;
+    const coincideEstado = filtroEstado === "todos" || pedido.estado === filtroEstado;
+    const nombre = pedido.cliente?.nombreReceptor?.toLowerCase() || "";
+    return coincideEstado && nombre.includes(busqueda.toLowerCase());
   });
 
   // Estadísticas
   const totalPedidos = pedidos.length;
   const pendientes = pedidos.filter(p => p.estado === "pendiente").length;
-  const entregados = pedidos.filter(p => p.estado === "entregado").length;
+  const entregados = pedidos.filter(p => p.estado === "aprobado").length;
   const totalVendido = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4 sm:p-6 pt-24">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4 sm:p-6 pt-24 relative">
+
+      {/* TOAST DE NOTIFICACIÓN */}
+      <div
+        className={`fixed top-24 right-4 z-50 transition-all duration-300 transform ${notification.show ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+          }`}
+      >
+        <div className={`rounded-xl shadow-2xl p-4 flex items-center gap-3 border-l-4 ${notification.type === "success"
+          ? "bg-white border-green-500 text-gray-800"
+          : "bg-white border-red-500 text-gray-800"
+          }`}>
+          <div className={`p-2 rounded-full ${notification.type === "success" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+            {notification.type === "success" ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            )}
+          </div>
+          <div>
+            <p className="font-bold text-sm">{notification.type === "success" ? "¡Éxito!" : "Error"}</p>
+            <p className="text-sm text-gray-600">{notification.message}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowDeleteModal(false)}
+          ></div>
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100">
+            <div className="w-16 h-16 rounded-full bg-red-100 mx-auto flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+
+            <h3 className="text-xl font-bold text-center text-gray-900 mb-2">¿Eliminar pedido?</h3>
+            <p className="text-center text-gray-600 mb-6">
+              Esta acción es permanente. Se eliminará el pedido, el cliente asociado y la imagen del comprobante. No se puede deshacer.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                disabled={loadingAction}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminacion}
+                className="flex-1 px-4 py-3 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 shadow-lg hover:shadow-red-500/30 transition-all flex justify-center items-center gap-2"
+                disabled={loadingAction}
+              >
+                {loadingAction ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
 
         {/* Header del dashboard */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center">
-              <span className="text-white font-bold text-xl">A</span>
+              <span className="text-white font-bold">A</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
               Panel Administrativo
@@ -222,7 +288,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow border border-gray-100 p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Entregados</p>
+                <p className="text-sm text-gray-500">Aprobados</p>
                 <p className="text-2xl font-bold text-green-600">{entregados}</p>
               </div>
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
@@ -275,7 +341,7 @@ const Dashboard = () => {
               >
                 <option value="todos">Todos los estados</option>
                 <option value="pendiente">Solo pendientes</option>
-                <option value="entregado">Solo entregados</option>
+                <option value="aprobado">Solo aprobados</option>
               </select>
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,7 +386,7 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-gray-900">
-                          Pedido: {pedido.id.slice(-8)}
+                          Pedido {pedido.numero}
                         </h3>
                         <p className="text-sm text-gray-500">
                           {new Date(pedido.fecha).toLocaleDateString('es-ES', {
@@ -343,7 +409,7 @@ const Dashboard = () => {
                         : "bg-green-100 text-green-700 border border-green-200"
                         }`}
                     >
-                      {pedido.estado === "pendiente" ? "⏳ Pendiente" : "✅ Entregado"}
+                      {pedido.estado === "pendiente" ? "⏳ Pendiente" : "✅ Aprobado"}
                     </span>
                   </div>
                 </div>
@@ -476,10 +542,15 @@ const Dashboard = () => {
                                 <div className="relative max-w-3xl w-full flex flex-col items-center">
                                   {/* Botón de cerrar */}
                                   <button
-                                    className="absolute -top-10 right-0 text-white text-xl font-bold hover:text-gray-300"
-                                    onClick={() => setIsOpen(false)}
+                                    className="fixed top-4 right-4 z-[60] bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full p-2 hover:bg-white/20 transition-all font-bold"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsOpen(false);
+                                    }}
                                   >
-                                    Cerrar ✕
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
                                   </button>
 
                                   <img
@@ -505,11 +576,11 @@ const Dashboard = () => {
                         : "bg-gradient-to-r from-gray-600 to-gray-500 text-white hover:from-gray-700 hover:to-gray-600 shadow-lg hover:shadow-xl"
                         }`}
                     >
-                      {pedido.estado === "pendiente" ? "✅ Marcar como entregado" : "⏳ Marcar como pendiente"}
+                      {pedido.estado === "pendiente" ? "✅ Marcar como aprobado" : "⏳ Marcar como pendiente"}
                     </button>
 
                     <button
-                      onClick={() => eliminarPedido(pedido.id)}
+                      onClick={() => solicitarEliminacion(pedido.id)}
                       className="px-5 py-2.5 rounded-xl font-medium bg-gradient-to-r from-gray-100 to-white text-gray-700 border border-gray-300 hover:bg-gradient-to-r hover:from-gray-200 hover:to-gray-100 active:bg-gray-300 transition-all duration-300"
                     >
                       Eliminar

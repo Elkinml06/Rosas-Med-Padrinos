@@ -85,7 +85,9 @@ export default function PagoNequi() {
       // Solo si la subida fue exitosa pasamos aquí
       let clienteId = null;
       try {
-        const nombreGuardar = datosCliente.anonimo ? "Anónimo" : datosCliente.nombreRemitente;
+        const nombreGuardar = datosCliente.anonimo
+          ? "Anónimo"
+          : (datosCliente.nombreRemitente || "Cliente Sin Nombre");
 
         // Intentar insertar
         const { data: dataInsert, error: errorInsert } = await supabase
