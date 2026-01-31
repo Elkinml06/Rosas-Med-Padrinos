@@ -54,41 +54,8 @@ export default function PagoNequi() {
 
       if (!datosCliente) return alert("Faltan los datos del cliente");
 
-      // 1. Obtener o crear Cliente en Supabase
-      let clienteId = null;
-      try {
-        const nombreGuardar = datosCliente.anonimo ? "Anónimo" : datosCliente.nombreRemitente;
-
-        // Intentar insertar
-        const { data: dataInsert, error: errorInsert } = await supabase
-          .from('clientes')
-          .insert([{ nombre: nombreGuardar, telefono: datosCliente.contacto }])
-          .select()
-          .single();
-
-        if (dataInsert) {
-          clienteId = dataInsert.id;
-        } else if (errorInsert && errorInsert.code === '23505') {
-          // Si ya existe, buscarlo por teléfono (asumiendo que es único)
-          const { data: dataExistente } = await supabase
-            .from('clientes')
-            .select('id')
-            .eq('telefono', datosCliente.contacto)
-            .single();
-
-          if (dataExistente) clienteId = dataExistente.id;
-        } else {
-          console.error("Error creando cliente:", errorInsert);
-          return alert("Error al registrar cliente. Intenta nuevamente.");
-        }
-      } catch (err) {
-        console.error("Error inesperado cliente:", err);
-        return alert("Error inesperado al procesar datos del cliente.");
-      }
-
-      if (!clienteId) return alert("No se pudo obtener el ID del cliente.");
-
-      // 2. Subir Comprobante a Supabase Storage (Bucket: vouchers)
+      // 1. Subir Comprobante a Supabase Storage (Bucket: vouchers)
+      // PRIMERO subimos el archivo. Si falla, no creamos cliente ni pedido.
       let publicUrl = "";
       try {
         const fileExt = file.name.split('.').pop();
@@ -114,7 +81,44 @@ export default function PagoNequi() {
         return alert("Error inesperado al subir archivo.");
       }
 
-      // 3. Guardar registro en comprobantes_pago
+      // 2. Obtener o crear Cliente en Supabase
+      // Solo si la subida fue exitosa pasamos aquí
+      let clienteId = null;
+      try {
+        const nombreGuardar = datosCliente.anonimo ? "Anónimo" : datosCliente.nombreRemitente;
+
+        // Intentar insertar
+        const { data: dataInsert, error: errorInsert } = await supabase
+          .from('clientes')
+          .insert([{ nombre: nombreGuardar, telefono: datosCliente.contacto }])
+          .select()
+          .single();
+
+        if (dataInsert) {
+          clienteId = dataInsert.id;
+        } else if (errorInsert && errorInsert.code === '23505') {
+          // Si ya existe, buscarlo por teléfono (asumiendo que es único)
+          const { data: dataExistente } = await supabase
+            .from('clientes')
+            .select('id')
+            .eq('telefono', datosCliente.contacto)
+            .single();
+
+          if (dataExistente) clienteId = dataExistente.id;
+        } else {
+          console.error("Error creando cliente:", errorInsert);
+          // Nota: Podríamos borrar la imagen subida si falla esto para limpiar, 
+          // pero por simplicidad alertamos.
+          return alert("Error al registrar cliente. Intenta nuevamente.");
+        }
+      } catch (err) {
+        console.error("Error inesperado cliente:", err);
+        return alert("Error inesperado al procesar datos del cliente.");
+      }
+
+      if (!clienteId) return alert("No se pudo obtener el ID del cliente.");
+
+      // 3. Guardar registro en comprobantes_pago (Pedido Completo)
       try {
         const { error: errorVoucher } = await supabase
           .from('comprobantes_pago')
@@ -122,16 +126,21 @@ export default function PagoNequi() {
             {
               cliente_id: clienteId,
               archivo_url: publicUrl,
-              estado: 'pendiente'
+              estado: 'pendiente',
+              productos: JSON.stringify(productos),
+              total: total,
+              datos_envio: JSON.stringify(datosCliente)
             }
           ]);
 
         if (errorVoucher) {
           console.error("Error guardando comprobante en DB:", errorVoucher);
-          // No detenemos el flujo localstorage, pero avisamos
+          // Si falla esto, es crítico, deberíamos avisar
+          return alert("Hubo un error guardando el pedido. Por favor contáctanos.");
         }
       } catch (err) {
         console.error("Error inesperado voucher DB:", err);
+        return alert("Error inesperado al guardar el pedido.");
       }
 
       const base64 = await fileToBase64(file);
@@ -153,10 +162,6 @@ export default function PagoNequi() {
           },
         },
       };
-
-      const pedidosPrevios = JSON.parse(localStorage.getItem("pedidos")) || [];
-      pedidosPrevios.push(pedidoFinal);
-      localStorage.setItem("pedidos", JSON.stringify(pedidosPrevios));
 
       setPedidoEnviado(true);
     } catch (error) {

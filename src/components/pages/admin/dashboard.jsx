@@ -1,44 +1,153 @@
-import { useEffect, useState } from "react";
+import { supabase } from "../../../supabase";
+import { useState, useEffect } from "react";
 
 const Dashboard = () => {
   const [pedidos, setPedidos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Cargar pedidos
+  // Cargar pedidos desde Supabase
+  const cargarPedidos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('comprobantes_pago')
+        .select(`
+          *,
+          clientes (
+            nombre,
+            telefono
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error cargando pedidos:", error);
+        return;
+      }
+
+      // Mapear los datos de Supabase al formato que espera el Dashboard
+      const pedidosFormateados = data.map(p => {
+        // Parsear JSONs si vienen como strings (aunque supabase returna objetos si es jsonb, a veces ayuda asegurar)
+        let productos = [];
+        let datosEnvio = {};
+
+        try {
+          productos = typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos;
+          datosEnvio = typeof p.datos_envio === 'string' ? JSON.parse(p.datos_envio) : p.datos_envio;
+        } catch (e) {
+          console.error("Error parseando JSON:", e);
+        }
+
+        return {
+          id: p.id,
+          fecha: p.created_at,
+          estado: p.estado,
+          total: p.total,
+          clienteId: p.cliente_id,
+          cliente: {
+            nombreReceptor: datosEnvio.nombreReceptor || p.clientes?.nombre || "N/A",
+            contacto: datosEnvio.contacto || p.clientes?.telefono || "N/A",
+            nombreRemitente: datosEnvio.nombreRemitente || "N/A",
+            anonimo: datosEnvio.anonimo,
+            mensajes: datosEnvio.mensajes || []
+          },
+          productos: productos,
+          pago: {
+            metodo: "Nequi",
+            comprobante: {
+              nombre: "Comprobante",
+              base64: p.archivo_url // Usamos la URL pública aquí
+            }
+          }
+        };
+      });
+
+      setPedidos(pedidosFormateados);
+    } catch (error) {
+      console.error("Error inesperado:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const pedidosGuardados =
-      JSON.parse(localStorage.getItem("pedidos")) || [];
-    setPedidos(pedidosGuardados.reverse());
+    cargarPedidos();
   }, []);
 
-  // Guardar cambios
-  const actualizarPedidos = (nuevosPedidos) => {
-    setPedidos(nuevosPedidos);
-    localStorage.setItem(
-      "pedidos",
-      JSON.stringify([...nuevosPedidos].reverse())
-    );
+  // Cambiar estado en Supabase
+  const cambiarEstado = async (id) => {
+    const pedidoActual = pedidos.find(p => p.id === id);
+    const nuevoEstado = pedidoActual.estado === "pendiente" ? "entregado" : "pendiente";
+
+    // Optimistic UI update
+    setPedidos(pedidos.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
+
+    const { error } = await supabase
+      .from('comprobantes_pago')
+      .update({ estado: nuevoEstado })
+      .eq('id', id);
+
+    if (error) {
+      console.error("Error actualizando estado:", error);
+      alert("Error al actualizar el estado");
+      cargarPedidos(); // revertir
+    }
   };
 
-  // Cambiar estado
-  const cambiarEstado = (id) => {
-    const nuevosPedidos = pedidos.map((p) =>
-      p.id === id
-        ? {
-            ...p,
-            estado: p.estado === "pendiente" ? "entregado" : "pendiente",
-          }
-        : p
-    );
-    actualizarPedidos(nuevosPedidos);
-  };
+  // Eliminar pedido en Supabase
+  // Eliminar pedido en Supabase (Cascading Delete)
+  const eliminarPedido = async (id) => {
+    if (!confirm("¿Estás seguro de eliminar este pedido permanentemente? Esto borrará también al cliente y la imagen.")) return;
 
-  // Eliminar pedido
-  const eliminarPedido = (id) => {
-    if (!confirm("¿Eliminar este pedido?")) return;
-    actualizarPedidos(pedidos.filter((p) => p.id !== id));
+    const pedidoAEliminar = pedidos.find(p => p.id === id);
+    if (!pedidoAEliminar) return;
+
+    // Optimistic UI update
+    const pedidosPrevios = [...pedidos];
+    setPedidos(pedidos.filter(p => p.id !== id));
+
+    try {
+      // 1. Eliminar Imagen del Storage
+      if (pedidoAEliminar.pago?.comprobante?.base64) {
+        const url = pedidoAEliminar.pago.comprobante.base64;
+        // Extraer el path relativo. Ejemplo: .../vouchers/comprobantes/archivo.jpg -> comprobantes/archivo.jpg
+        const path = url.split('/vouchers/')[1];
+        if (path) {
+          const { error: errorStorage } = await supabase.storage
+            .from('vouchers')
+            .remove([path]);
+
+          if (errorStorage) console.error("Error borrando imagen:", errorStorage);
+        }
+      }
+
+      // 2. Eliminar el Pedido (comprobantes_pago)
+      const { error: errorPedido } = await supabase
+        .from('comprobantes_pago')
+        .delete()
+        .eq('id', id);
+
+      if (errorPedido) throw errorPedido;
+
+      // 3. Eliminar el Cliente (clientes)
+      // Solo si tenemos el ID (lo agregamos en el mapeo)
+      if (pedidoAEliminar.clienteId) {
+        const { error: errorCliente } = await supabase
+          .from('clientes')
+          .delete()
+          .eq('id', pedidoAEliminar.clienteId);
+
+        if (errorCliente) console.error("Error borrando cliente:", errorCliente);
+      }
+
+    } catch (error) {
+      console.error("Error eliminando pedido completo:", error);
+      alert("Error al eliminar el pedido. Revisa la consola.");
+      setPedidos(pedidosPrevios); // revertir si falla la eliminación crítica del pedido
+    }
   };
 
   // Filtros
@@ -58,12 +167,12 @@ const Dashboard = () => {
   const totalPedidos = pedidos.length;
   const pendientes = pedidos.filter(p => p.estado === "pendiente").length;
   const entregados = pedidos.filter(p => p.estado === "entregado").length;
-  const totalVendido = pedidos.reduce((sum, p) => sum + (p.total || 0), 0);
+  const totalVendido = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4 sm:p-6 pt-24">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Header del dashboard */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -187,7 +296,7 @@ const Dashboard = () => {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">No hay pedidos</h3>
             <p className="text-gray-600 max-w-md mx-auto">
-              {pedidos.length === 0 
+              {pedidos.length === 0
                 ? "Aún no se han registrado pedidos. Los pedidos aparecerán aquí cuando los clientes completen sus compras."
                 : "No hay pedidos que coincidan con los filtros aplicados."}
             </p>
@@ -229,11 +338,10 @@ const Dashboard = () => {
 
                   <div className="flex items-center gap-3 mt-3 sm:mt-0">
                     <span
-                      className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                        pedido.estado === "pendiente"
-                          ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                          : "bg-green-100 text-green-700 border border-green-200"
-                      }`}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold ${pedido.estado === "pendiente"
+                        ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                        : "bg-green-100 text-green-700 border border-green-200"
+                        }`}
                     >
                       {pedido.estado === "pendiente" ? "⏳ Pendiente" : "✅ Entregado"}
                     </span>
@@ -248,19 +356,19 @@ const Dashboard = () => {
                       <p className="text-sm font-medium text-gray-500 mb-1">Receptor</p>
                       <p className="font-semibold text-gray-900">{pedido.cliente?.nombreReceptor || "—"}</p>
                     </div>
-                    
+
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-500 mb-1">Contacto</p>
                       <p className="font-semibold text-gray-900">{pedido.cliente?.contacto || "—"}</p>
                     </div>
-                    
+
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-500 mb-1">Remitente</p>
                       <p className="font-semibold text-gray-900">
                         {pedido.cliente?.anonimo ? "Anónimo" : (pedido.cliente?.nombreRemitente || "—")}
                       </p>
                     </div>
-                    
+
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-500 mb-1">Método de Pago</p>
                       <p className="font-semibold text-gray-900">{pedido.pago?.metodo || "Nequi"}</p>
@@ -313,7 +421,7 @@ const Dashboard = () => {
                               className="w-full h-full object-contain"
                             />
                           </div>
-                          
+
                           <div className="flex-1">
                             <div className="flex justify-between items-start">
                               <div>
@@ -341,62 +449,61 @@ const Dashboard = () => {
                       ${pedido.total?.toLocaleString()}
                     </div>
                     {pedido.pago?.comprobante && (
-  <div className="mt-3 space-y-2">
-    <p className="text-sm text-gray-500 flex items-center gap-1">
-      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-      </svg>
-      Comprobante: {pedido.pago.comprobante.nombre}
-    </p>
+                      <div className="mt-3 space-y-2">
+                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                          </svg>
+                          Comprobante: {pedido.pago.comprobante.nombre}
+                        </p>
 
-    {/* 👇 IMAGEN DEL COMPROBANTE (Miniatura) */}
-{pedido.pago.comprobante.base64 && (
-  <>
-    <img
-      src={pedido.pago.comprobante.base64}
-      alt="Comprobante de pago"
-      onClick={() => setIsOpen(true)} // Abrir modal
-      className="w-40 rounded-lg border border-gray-300 shadow-sm hover:scale-105 transition-transform cursor-pointer"
-    />
+                        {/* 👇 IMAGEN DEL COMPROBANTE (Miniatura) */}
+                        {pedido.pago.comprobante.base64 && (
+                          <>
+                            <img
+                              src={pedido.pago.comprobante.base64}
+                              alt="Comprobante de pago"
+                              onClick={() => setIsOpen(true)} // Abrir modal
+                              className="w-40 rounded-lg border border-gray-300 shadow-sm hover:scale-105 transition-transform cursor-pointer"
+                            />
 
-    {/* 👇 MODAL (Se muestra solo si isOpen es true) */}
-    {isOpen && (
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 animate-in fade-in duration-300"
-        onClick={() => setIsOpen(false)} // Cerrar al hacer clic fuera
-      >
-        <div className="relative max-w-3xl w-full flex flex-col items-center">
-          {/* Botón de cerrar */}
-          <button 
-            className="absolute -top-10 right-0 text-white text-xl font-bold hover:text-gray-300"
-            onClick={() => setIsOpen(false)}
-          >
-            Cerrar ✕
-          </button>
-          
-          <img
-            src={pedido.pago.comprobante.base64}
-            alt="Comprobante ampliado"
-            className="max-h-[90vh] max-w-full rounded-md shadow-2xl object-contain"
-          />
-        </div>
-      </div>
-    )}
-  </>
-)}
-  </div>
-)}
+                            {/* 👇 MODAL (Se muestra solo si isOpen es true) */}
+                            {isOpen && (
+                              <div
+                                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 animate-in fade-in duration-300"
+                                onClick={() => setIsOpen(false)} // Cerrar al hacer clic fuera
+                              >
+                                <div className="relative max-w-3xl w-full flex flex-col items-center">
+                                  {/* Botón de cerrar */}
+                                  <button
+                                    className="absolute -top-10 right-0 text-white text-xl font-bold hover:text-gray-300"
+                                    onClick={() => setIsOpen(false)}
+                                  >
+                                    Cerrar ✕
+                                  </button>
+
+                                  <img
+                                    src={pedido.pago.comprobante.base64}
+                                    alt="Comprobante ampliado"
+                                    className="max-h-[90vh] max-w-full rounded-md shadow-2xl object-contain"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
 
                   </div>
 
                   <div className="flex gap-3">
                     <button
                       onClick={() => cambiarEstado(pedido.id)}
-                      className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                        pedido.estado === "pendiente"
-                          ? "bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600 shadow-lg hover:shadow-xl"
-                          : "bg-gradient-to-r from-gray-600 to-gray-500 text-white hover:from-gray-700 hover:to-gray-600 shadow-lg hover:shadow-xl"
-                      }`}
+                      className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-300 ${pedido.estado === "pendiente"
+                        ? "bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600 shadow-lg hover:shadow-xl"
+                        : "bg-gradient-to-r from-gray-600 to-gray-500 text-white hover:from-gray-700 hover:to-gray-600 shadow-lg hover:shadow-xl"
+                        }`}
                     >
                       {pedido.estado === "pendiente" ? "✅ Marcar como entregado" : "⏳ Marcar como pendiente"}
                     </button>
@@ -410,7 +517,7 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Barra decorativa inferior */}
               <div className="h-1 bg-gradient-to-r from-red-500 via-gray-400 to-black opacity-60"></div>
             </div>

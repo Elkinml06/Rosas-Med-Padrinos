@@ -18,6 +18,13 @@ ON clientes FOR SELECT
 TO public
 USING (true);
 
+-- Permitir eliminar clientes (para cascading delete)
+DROP POLICY IF EXISTS "Permitir eliminar clientes publicamente" ON clientes;
+CREATE POLICY "Permitir eliminar clientes publicamente"
+ON clientes FOR DELETE
+TO public
+USING (true);
+
 -- 2. Políticas para tabla COMPROBANTES_PAGO
 
 -- Permitir insertar comprobantes
@@ -31,6 +38,20 @@ WITH CHECK (true);
 DROP POLICY IF EXISTS "Permitir leer comprobantes publicamente" ON comprobantes_pago;
 CREATE POLICY "Permitir leer comprobantes publicamente"
 ON comprobantes_pago FOR SELECT
+TO public
+USING (true);
+
+-- Permitir actualizar (para cambiar estado en dashboard)
+DROP POLICY IF EXISTS "Permitir actualizar comprobantes publicamente" ON comprobantes_pago;
+CREATE POLICY "Permitir actualizar comprobantes publicamente"
+ON comprobantes_pago FOR UPDATE
+TO public
+USING (true);
+
+-- Permitir eliminar (para borrar pedidos en dashboard)
+DROP POLICY IF EXISTS "Permitir eliminar comprobantes publicamente" ON comprobantes_pago;
+CREATE POLICY "Permitir eliminar comprobantes publicamente"
+ON comprobantes_pago FOR DELETE
 TO public
 USING (true);
 
@@ -52,5 +73,12 @@ WITH CHECK (bucket_id = 'vouchers');
 DROP POLICY IF EXISTS "Permitir ver comprobantes publicamente" ON storage.objects;
 CREATE POLICY "Permitir ver comprobantes publicamente"
 ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'vouchers');
+
+-- Permitir eliminar archivos (para cascading delete)
+DROP POLICY IF EXISTS "Permitir eliminar comprobantes publicamente" ON storage.objects;
+CREATE POLICY "Permitir eliminar comprobantes publicamente"
+ON storage.objects FOR DELETE
 TO public
 USING (bucket_id = 'vouchers');
