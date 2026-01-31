@@ -59,6 +59,7 @@ const Dashboard = () => {
           cliente: {
             nombreReceptor: datosEnvio.nombreReceptor || p.clientes?.nombre || "N/A",
             contacto: datosEnvio.contacto || p.clientes?.telefono || "N/A",
+            carrera: datosEnvio.carrera || "N/A",
             nombreRemitente: datosEnvio.nombreRemitente || "N/A",
             anonimo: datosEnvio.anonimo,
             mensajes: datosEnvio.mensajes || []
@@ -426,6 +427,11 @@ const Dashboard = () => {
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-500 mb-1">Contacto</p>
                       <p className="font-semibold text-gray-900">{pedido.cliente?.contacto || "—"}</p>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-500 mb-1">Carrera</p>
+                      <p className="font-semibold text-gray-900">{pedido.cliente?.carrera || "—"}</p>
                     </div>
 
                     <div className="p-4 bg-gray-50 rounded-lg">

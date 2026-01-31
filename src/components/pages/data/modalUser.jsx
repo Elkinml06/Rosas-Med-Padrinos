@@ -10,6 +10,12 @@ const PRODUCTOS_BASE = {
   3: { nombre: "Rosa + Carta", imagen: RosaCartaImg, tipo: "combo" },
 };
 
+const CARRERAS = [
+  "Enfermería",
+  "Medicina",
+  "Psicología",
+];
+
 export default function DatosPedido() {
   const navigate = useNavigate();
   const primeraCarga = useRef(true);
@@ -31,6 +37,7 @@ export default function DatosPedido() {
   const [anonimo, setAnonimo] = useState(true);
   const [nombreRemitente, setNombreRemitente] = useState("");
   const [nombreReceptor, setNombreReceptor] = useState("");
+  const [carrera, setCarrera] = useState("");
   const [contacto, setContacto] = useState("");
   const [mensajes, setMensajes] = useState([]);
   const [error, setError] = useState("");
@@ -42,6 +49,7 @@ export default function DatosPedido() {
       setAnonimo(guardado.anonimo ?? true);
       setNombreRemitente(guardado.nombreRemitente || "");
       setNombreReceptor(guardado.nombreReceptor || "");
+      setCarrera(guardado.carrera || "");
       setContacto(guardado.contacto || "");
 
       if (Array.isArray(guardado.mensajes)) {
@@ -78,16 +86,20 @@ export default function DatosPedido() {
         anonimo,
         nombreRemitente,
         nombreReceptor,
+        carrera,
         contacto,
         mensajes,
         timestamp: Date.now(),
       })
     );
-  }, [anonimo, nombreRemitente, nombreReceptor, contacto, mensajes]);
+  }, [anonimo, nombreRemitente, nombreReceptor, carrera, contacto, mensajes]);
 
   const continuar = async () => {
     if (!nombreReceptor.trim())
       return setError("Debes ingresar el nombre del receptor");
+
+    if (!carrera)
+      return setError("Debes seleccionar una carrera");
 
     if (!/^\d{10}$/.test(contacto))
       return setError("El número debe tener 10 dígitos");
@@ -195,6 +207,25 @@ export default function DatosPedido() {
                     value={nombreReceptor}
                     onChange={(e) => setNombreReceptor(e.target.value)}
                   />
+                </div>
+
+                {/* Carrera  */}
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    Carrera / Programa
+                  </p>
+                  <select
+                    className="w-full p-3 rounded-xl border bg-white"
+                    value={carrera}
+                    onChange={(e) => setCarrera(e.target.value)}
+                  >
+                    <option value="">Selecciona una carrera...</option>
+                    {CARRERAS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Contacto */}
