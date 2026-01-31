@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import RosaImg from "../../../assets/rosa.avif";
-
+import RosaImg from "../../../assets/rosa.png";
+import CartaImg from "../../../assets/carta.png";
+import RosaCartaImg from "../../../assets/rosa+carta.png";
 
 const PRODUCTOS_BASE = {
   1: { nombre: "Rosa", imagen: RosaImg, tipo: "rosa" },
-  2: { nombre: "Carta", imagen: RosaImg, tipo: "carta" },
-  3: { nombre: "Rosa + Carta", imagen: RosaImg, tipo: "combo" },
+  2: { nombre: "Carta", imagen: CartaImg, tipo: "carta" },
+  3: { nombre: "Rosa + Carta", imagen: RosaCartaImg, tipo: "combo" },
 };
 
 export default function DatosPedido() {
@@ -75,7 +76,6 @@ export default function DatosPedido() {
       "datosPedido",
       JSON.stringify({
         anonimo,
-        nombreRemitente: anonimo ? "Anónimo" : nombreRemitente,
         nombreReceptor,
         contacto,
         mensajes,
@@ -133,69 +133,105 @@ export default function DatosPedido() {
               </p>
 
               <div className="space-y-6">
-                <div>
-                  <label className="font-medium mb-2 block">
-                    ¿Enviar de forma anónima?
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {[
-                      { label: "Sí, anónimo", value: true },
-                      { label: "No, mostrar mi nombre", value: false },
-                    ].map((op) => (
-                      <label key={op.label} className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          checked={anonimo === op.value}
-                          onChange={() => setAnonimo(op.value)}
-                        />
-                        {op.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <div className="space-y-2">
+  {/* TITULO */}
+  <p className="text-sm font-semibold text-gray-700">
+    Tipo de envío
+  </p>
 
-                {!anonimo && (
-                  <input
-                    type="text"
-                    placeholder="Tu nombre"
-                    className="w-full p-3 rounded-xl border"
-                    value={nombreRemitente}
-                    onChange={(e) => setNombreRemitente(e.target.value)}
-                  />
-                )}
+  {/* DESCRIPCIÓN */}
+  <p className="text-xs text-gray-500">
+    Elige si quieres que tu nombre aparezca o enviar el regalo en anonimato.
+  </p>
 
-                <input
-                  type="text"
-                  placeholder="Nombre del receptor"
-                  className="w-full p-3 rounded-xl border"
-                  value={nombreReceptor}
-                  onChange={(e) => setNombreReceptor(e.target.value)}
-                />
+  {/* OPCIONES */}
+  <div className="flex flex-col sm:flex-row gap-4 mt-2">
+    {[
+      { label: "Sí, anónimo", value: true },
+      { label: "No, mostrar mi nombre", value: false },
+    ].map((op) => (
+      <label
+        key={op.label}
+        className="flex items-center gap-3 cursor-pointer"
+      >
+        <input
+          type="radio"
+          checked={anonimo === op.value}
+          onChange={() => setAnonimo(op.value)}
+        />
+        <span>{op.label}</span>
+      </label>
+    ))}
+  </div>
+</div>
 
-                <input
-                  type="text"
-                  placeholder="Número de contacto"
-                  className="w-full p-3 rounded-xl border"
-                  value={contacto}
-                  onChange={(e) =>
-                    setContacto(e.target.value.replace(/\D/g, ""))
-                  }
-                />
 
-                {mensajes.map((mensaje, i) => (
-                  <textarea
-                    key={i}
-                    placeholder={`Mensaje carta ${i + 1}`}
-                    className="w-full p-3 rounded-xl border h-36 resize-none"
-                    maxLength={500}
-                    value={mensaje}
-                    onChange={(e) => {
-                      const copy = [...mensajes];
-                      copy[i] = e.target.value;
-                      setMensajes(copy);
-                    }}
-                  />
-                ))}
+                {/* Nombre remitente (solo si no es anónimo) */}
+{!anonimo && (
+  <div className="space-y-1">
+    <p className="text-sm font-semibold text-gray-700">
+      Tu nombre
+    </p>
+    <input
+      type="text"
+      placeholder="Ej: Juan Pérez"
+      className="w-full p-3 rounded-xl border"
+      value={nombreRemitente}
+      onChange={(e) => setNombreRemitente(e.target.value)}
+    />
+  </div>
+)}
+
+{/* Nombre receptor */}
+<div className="space-y-1">
+  <p className="text-sm font-semibold text-gray-700">
+    Nombre del receptor
+  </p>
+  <input
+    type="text"
+    placeholder="Ej: María López"
+    className="w-full p-3 rounded-xl border"
+    value={nombreReceptor}
+    onChange={(e) => setNombreReceptor(e.target.value)}
+  />
+</div>
+
+{/* Contacto */}
+<div className="space-y-1">
+  <p className="text-sm font-semibold text-gray-700">
+    Número de contacto
+  </p>
+  <input
+    type="text"
+    placeholder="Ej: 3001234567"
+    className="w-full p-3 rounded-xl border"
+    value={contacto}
+    onChange={(e) =>
+      setContacto(e.target.value.replace(/\D/g, ""))
+    }
+  />
+</div>
+
+{/* Mensajes de cartas */}
+{mensajes.map((mensaje, i) => (
+  <div key={i} className="space-y-1">
+    <p className="text-sm font-semibold text-gray-700">
+      Mensaje de la carta {i + 1}
+    </p>
+    <textarea
+      placeholder="Escribe aquí tu mensaje..."
+      className="w-full p-3 rounded-xl border h-36 resize-none"
+      maxLength={500}
+      value={mensaje}
+      onChange={(e) => {
+        const copy = [...mensajes];
+        copy[i] = e.target.value;
+        setMensajes(copy);
+      }}
+    />
+  </div>
+))}
+
               </div>
             </div>
             <div className="h-1 bg-gradient-to-r from-red-500 via-gray-400 to-black opacity-60" />
