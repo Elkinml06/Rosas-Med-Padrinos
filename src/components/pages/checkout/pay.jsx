@@ -82,36 +82,37 @@ export default function PagoNequi() {
       }
 
       // 2. Obtener o crear Cliente en Supabase
-      // Solo si la subida fue exitosa pasamos aquí
+      // Optimización: Buscar primero, insertar solo si no existe
       let clienteId = null;
       try {
         const nombreGuardar = datosCliente.anonimo
           ? "Anónimo"
           : (datosCliente.nombreRemitente || "Cliente Sin Nombre");
 
-        // Intentar insertar
-        const { data: dataInsert, error: errorInsert } = await supabase
+        // Buscar cliente existente primero
+        const { data: clienteExistente } = await supabase
           .from('clientes')
-          .insert([{ nombre: nombreGuardar, telefono: datosCliente.contacto }])
-          .select()
-          .single();
+          .select('id')
+          .eq('telefono', datosCliente.contacto)
+          .maybeSingle();
 
-        if (dataInsert) {
-          clienteId = dataInsert.id;
-        } else if (errorInsert && errorInsert.code === '23505') {
-          // Si ya existe, buscarlo por teléfono (asumiendo que es único)
-          const { data: dataExistente } = await supabase
+        if (clienteExistente) {
+          // Cliente ya existe, reutilizar ID
+          clienteId = clienteExistente.id;
+        } else {
+          // Cliente nuevo, insertar
+          const { data: nuevoCliente, error: errorInsert } = await supabase
             .from('clientes')
-            .select('id')
-            .eq('telefono', datosCliente.contacto)
+            .insert([{ nombre: nombreGuardar, telefono: datosCliente.contacto }])
+            .select()
             .single();
 
-          if (dataExistente) clienteId = dataExistente.id;
-        } else {
-          console.error("Error creando cliente:", errorInsert);
-          // Nota: Podríamos borrar la imagen subida si falla esto para limpiar, 
-          // pero por simplicidad alertamos.
-          return alert("Error al registrar cliente. Intenta nuevamente.");
+          if (nuevoCliente) {
+            clienteId = nuevoCliente.id;
+          } else {
+            console.error("Error creando cliente:", errorInsert);
+            return alert("Error al registrar cliente. Intenta nuevamente.");
+          }
         }
       } catch (err) {
         console.error("Error inesperado cliente:", err);
@@ -137,35 +138,15 @@ export default function PagoNequi() {
 
         if (errorVoucher) {
           console.error("Error guardando comprobante en DB:", errorVoucher);
-          // Si falla esto, es crítico, deberíamos avisar
           return alert("Hubo un error guardando el pedido. Por favor contáctanos.");
         }
+
+        // Optimización: Mostrar éxito inmediatamente después del guardado exitoso
+        setPedidoEnviado(true);
       } catch (err) {
         console.error("Error inesperado voucher DB:", err);
         return alert("Error inesperado al guardar el pedido.");
       }
-
-      const base64 = await fileToBase64(file);
-
-      const pedidoFinal = {
-        id: `PED-${Date.now()}`,
-        fecha: new Date().toISOString(),
-        estado: "pendiente",
-        cliente: datosCliente,
-        productos,
-        total,
-        pago: {
-          metodo: "Nequi",
-          comprobante: {
-            nombre: file.name,
-            tipo: file.type,
-            tamaño: file.size,
-            base64,
-          },
-        },
-      };
-
-      setPedidoEnviado(true);
     } catch (error) {
       console.error(error);
       alert("Error al enviar el pedido. Intenta nuevamente.");

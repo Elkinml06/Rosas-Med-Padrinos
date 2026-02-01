@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import RosaImg from "../../../assets/rosa.png";
-import CartaImg from "../../../assets/carta.png";
-import RosaCartaImg from "../../../assets/rosa+carta.png";
+import RosaImg from "../../../assets/images/rosa.png";
+import CartaImg from "../../../assets/images/carta.png";
+import RosaCartaImg from "../../../assets/images/rosa+carta.png";
 
 const productos = [
   {
@@ -145,7 +145,7 @@ export default function SeleccionProductos() {
                       onClick={() => disminuir(producto.id)}
                       className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-center"
                     >
-                      <span className="text-lg sm:text-xl">−</span>
+                      <span className="text-lg sm:text-xl leading-none">−</span>
                     </button>
 
                     <span className="text-lg sm:text-xl font-bold text-gray-900 min-w-6 text-center">
@@ -156,7 +156,7 @@ export default function SeleccionProductos() {
                       onClick={() => aumentar(producto.id)}
                       className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-red-500 text-white hover:bg-red-600 active:bg-red-700 flex items-center justify-center"
                     >
-                      <span className="text-lg sm:text-xl">+</span>
+                      <span className="text-lg sm:text-xl leading-none">+</span>
                     </button>
                   </div>
                 </div>
@@ -175,10 +175,9 @@ export default function SeleccionProductos() {
           onClick={continuar}
           disabled={!hayProductosSeleccionados}
           className={`w-full sm:w-auto px-10 py-4 rounded-full text-lg font-bold transition-all duration-300
-            ${
-              hayProductosSeleccionados
-                ? "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-lg hover:-translate-y-1"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            ${hayProductosSeleccionados
+              ? "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-lg hover:-translate-y-1"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
         >
           <span className="flex items-center justify-center gap-2">

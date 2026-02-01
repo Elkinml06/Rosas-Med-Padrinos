@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import RosaImg from "../../../assets/rosa.png";
-import CartaImg from "../../../assets/carta.png";
-import RosaCartaImg from "../../../assets/rosa+carta.png";
+import RosaImg from "../../../assets/images/rosa.png";
+import CartaImg from "../../../assets/images/carta.png";
+import RosaCartaImg from "../../../assets/images/rosa+carta.png";
 
 const PRODUCTOS_BASE = {
   1: { nombre: "Rosa", imagen: RosaImg, tipo: "rosa" },
