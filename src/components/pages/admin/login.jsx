@@ -9,7 +9,7 @@ const Login = () => {
     const navigate = useNavigate();
 
     const VALID_USER = "claveadmin";
-    const VALID_PASS = "Admmin";
+    const VALID_PASS = "Admin";
 
     const handleSubmit = (e) => {
         e.preventDefault();
